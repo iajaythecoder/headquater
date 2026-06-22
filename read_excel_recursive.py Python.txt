@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+"""
+Recursively read all Excel files from a folder and its subfolders.
+"""
+
+import argparse
+from pathlib import Path
+from openpyxl import load_workbook
+import sys
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Recursively find and read all Excel files in a folder tree."
+    )
+    parser.add_argument(
+        "folder", 
+        nargs="?", 
+        default=".",
+        help="Root folder to search (default: current directory)"
+    )
+    parser.add_argument(
+        "-e", "--extensions", 
+        nargs="+", 
+        default=[".xlsx", ".xls", ".xlsm"],
+        help="File extensions to search for (default: .xlsx .xls .xlsm)"
+    )
+    parser.add_argument(
+        "-s", "--summary", 
+        action="store_true",
+        help="Show only summary (no detailed sheet names)"
+    )
+    parser.add_argument(
+        "-o", "--output",
+        help="Save list of found files to a text file"
+    )
+
+    args = parser.parse_args()
+
+    root = Path(args.folder).resolve()
+    
+    if not root.exists():
+        print(f"Error: Folder '{root}' does not exist.", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"🔍 Searching for Excel files in: {root}\n")
+
+    extensions = {ext.lower() for ext in args.extensions}
+    excel_files = []
+    count = 0
+
+    for file_path in root.rglob("*"):
+        if file_path.is_file() and file_path.suffix.lower() in extensions:
+            count += 1
+            try:
+                wb = load_workbook(file_path, data_only=True)
+                sheet_count = len(wb.sheetnames)
+                
+                print(f"✓ {file_path.name}  ({sheet_count} sheets)  →  {file_path.parent.name}/")
+                
+                excel_files.append({
+                    "path": str(file_path),
+                    "filename": file_path.name,
+                    "folder": str(file_path.parent.relative_to(root)),
+                    "sheets": wb.sheetnames
+                })
+                
+            except Exception as e:
+                print(f"✗ Error reading {file_path.name}: {e}")
+
+    # Summary
+    print("\n" + "="*60)
+    print(f"✅ Completed! Found {count} Excel file(s)")
+    print("="*60)
+
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as f:
+            for file in excel_files:
+                f.write(f"{file['path']}\n")
+        print(f"📄 File list saved to: {args.output}")
+
+    if args.summary:
+        print(f"Total Excel files found: {count}")
+
+
+if __name__ == "__main__":
+    main()
