@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Consolidate Capability Investment Case - With Debug Output
+Consolidate Capability Investment Case - Fixed + Full Debug
 """
 
 import argparse
@@ -15,6 +15,14 @@ def is_valid_xlsx(file_path):
         return zipfile.is_zipfile(file_path)
     except:
         return False
+
+
+def is_checked(val):
+    """Robust checkbox detection"""
+    if val is None:
+        return False
+    val_str = str(val).strip().lower()
+    return val_str in ["true", "☑", "x", "1"]
 
 
 def extract_from_sheet(wb, filename):
@@ -39,15 +47,16 @@ def extract_from_sheet(wb, filename):
     data["Business_Capability"] = get_cell(4, 12)
     data["JIRA_ID"] = get_cell(4, 13)
 
-    # === FSA Category Debug ===
     print(f"\n--- {filename} ---")
+
+    # === FSA Category ===
     fsa = []
     for r in range(12, 16):
         checkbox_val = get_cell(7, r)
         label_val = get_cell(6, r)
-        is_checked = checkbox_val in ["☑", "TRUE", "x", "X", "1", True]
-        print(f"FSA_Category    | G{r} = '{checkbox_val}' → Checked: {is_checked} | F{r} = '{label_val}'")
-        if is_checked and label_val:
+        checked = is_checked(checkbox_val)
+        print(f"FSA_Category    | G{r} = '{checkbox_val}' → Checked: {checked} | F{r} = '{label_val}'")
+        if checked and label_val:
             fsa.append(label_val)
     data["FSA_Category"] = ", ".join(fsa)
 
@@ -56,28 +65,27 @@ def extract_from_sheet(wb, filename):
     data["Tech_Investment_2027_k"] = get_cell(11, 7)
     data["Multi_Year_Funding"] = get_cell(11, 10)
 
-    # === Customer Segment Debug ===
+    # === Customer Segment ===
     segments = []
     for r in range(6, 10):
         checkbox_val = get_cell(7, r)
         label_val = get_cell(6, r)
-        is_checked = checkbox_val in ["☑", "TRUE", "x", "X", "1", True]
-        print(f"Customer_Segment | G{r} = '{checkbox_val}' → Checked: {is_checked} | F{r} = '{label_val}'")
-        if is_checked and label_val:
+        checked = is_checked(checkbox_val)
+        print(f"Customer_Segment | G{r} = '{checkbox_val}' → Checked: {checked} | F{r} = '{label_val}'")
+        if checked and label_val:
             segments.append(label_val)
     data["Customer_Segment"] = ", ".join(segments)
 
-    # === Markets Impacted Debug ===
+    # === Markets Impacted (Now always prints debug) ===
     markets = []
     for r in range(18, 40):
         g_val = get_cell(7, r)
         h_val = get_cell(8, r)
         label_val = get_cell(6, r)
-        is_checked = g_val in ["☑", "TRUE", "x", "X", "1", True] or h_val in ["☑", "TRUE", "x", "X", "1", True]
-        if is_checked:
-            print(f"Markets_Impacted | G{r}='{g_val}' H{r}='{h_val}' → Checked | F{r} = '{label_val}'")
-            if label_val:
-                markets.append(label_val)
+        checked = is_checked(g_val) or is_checked(h_val)
+        print(f"Markets_Impacted | G{r}='{g_val}' H{r}='{h_val}' → Checked: {checked} | F{r} = '{label_val}'")
+        if checked and label_val:
+            markets.append(label_val)
     data["Markets_Impacted"] = ", ".join(markets)
 
     # === Other Fields ===
@@ -99,7 +107,7 @@ def main():
     root = Path(args.folder).resolve()
     output_file = Path(args.output)
 
-    print(f"🔍 Scanning folder: {root}\n")
+    print(f"🔍 Scanning: {root}\n")
 
     records = []
 
@@ -107,7 +115,7 @@ def main():
         if "~$" in file_path.name:
             continue
         if not is_valid_xlsx(file_path):
-            print(f"⚠️ Skipped (not valid xlsx): {file_path.name}")
+            print(f"⚠️ Skipped invalid: {file_path.name}")
             continue
 
         try:
@@ -121,10 +129,10 @@ def main():
             records.append(row_data)
 
         except Exception as e:
-            print(f"✗ Failed to process {file_path.name}: {e}")
+            print(f"✗ Failed {file_path.name}: {e}")
 
     if not records:
-        print("\nNo files processed.")
+        print("No files processed.")
         return
 
     # Save output
@@ -137,18 +145,4 @@ def main():
                "JIRA_ID", "FSA_Category", "T_Shirt_Size", "Tech_Investment_2027_k",
                "Multi_Year_Funding", "Customer_Segment", "Markets_Impacted",
                "Business_Outcome_Lead", "Capability_Description", "Investment_Case_Breakdown",
-               "Business_Benefit_WHY", "OKR_Summary"]
-
-    for col, h in enumerate(headers, 1):
-        ws.cell(1, col, h)
-
-    for r_idx, row in enumerate(records, 2):
-        for c_idx, h in enumerate(headers, 1):
-            ws.cell(r_idx, c_idx, row.get(h, ""))
-
-    wb_out.save(output_file)
-    print(f"\n✅ Done! Saved {len(records)} rows to {output_file}")
-
-
-if __name__ == "__main__":
-    main()
+               "Business_Benefit_WHY", "OKR_S
