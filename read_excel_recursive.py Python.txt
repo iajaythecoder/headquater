@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Consolidate Capability Investment Case - Final Fixed Version
+Consolidate Capability Investment Case - Final Version
+Uses exact checkbox and label columns from your mapping
 """
 
 import argparse
@@ -8,6 +9,7 @@ from pathlib import Path
 from datetime import datetime
 import zipfile
 from openpyxl import load_workbook, Workbook
+
 
 def is_valid_xlsx(file_path):
     try:
@@ -28,51 +30,46 @@ def extract_from_sheet(wb):
 
     data = {}
 
-    # Basic Fields
-    data["Capability_Name"] = get_cell(3, 6)
-    data["Funder"] = get_cell(3, 7)
-    data["Builder_SVS"] = get_cell(3, 8)
-    data["Funding_Type"] = get_cell(3, 9)
-    data["Investment_Themes"] = get_cell(3, 10)
-    data["Discovery_Maturity"] = get_cell(3, 11)
-    data["Business_Capability"] = get_cell(3, 12)
-    data["JIRA_ID"] = get_cell(3, 13)
+    # === Basic Fields ===
+    data["Capability_Name"] = get_cell(4, 6)
+    data["Funder"] = get_cell(4, 7)
+    data["Builder_SVS"] = get_cell(4, 8)
+    data["Funding_Type"] = get_cell(4, 9)
+    data["Investment_Themes"] = get_cell(4, 10)
+    data["Discovery_Maturity"] = get_cell(4, 11)
+    data["Business_Capability"] = get_cell(4, 12)
+    data["JIRA_ID"] = get_cell(4, 13)
 
-    # === FSA Category ===
+    # === FSA Category (G12:G15 checkbox, F12:F15 label) ===
     fsa = []
-    for r in [12, 13]:
-        checkbox = get_cell(6, r)          # Column F = Checkbox?
-        if checkbox in ["☑", "TRUE", "x", "X", "1", True]:
-            fsa.append(get_cell(5, r))     # Label in Column E
-    data["FSA_Category"] = ", ".join(fsa)
+    for r in range(12, 16):
+        if get_cell(7, r) in ["☑", "TRUE", "x", "X", "1", True]:
+            fsa.append(get_cell(6, r))          # Label from Column F
+    data["FSA_Category"] = ", ".join([x for x in fsa if x])
 
-    # Financial
-    data["T_Shirt_Size"] = get_cell(10, 6)
-    data["Tech_Investment_2027_k"] = get_cell(10, 7)
-    data["Multi_Year_Funding"] = get_cell(10, 10)
+    # === Financial ===
+    data["T_Shirt_Size"] = get_cell(11, 6)
+    data["Tech_Investment_2027_k"] = get_cell(11, 7)
+    data["Multi_Year_Funding"] = get_cell(11, 10)
 
-    # === CUSTOMER SEGMENT ===
+    # === Customer Segment (G6:G9 checkbox, F6:F9 label) ===
     segments = []
     for r in range(6, 10):
-        checkbox = get_cell(7, r)          # Column G = Checkbox
-        if checkbox in ["☑", "TRUE", "x", "X", "1", True]:
-            segments.append(get_cell(6, r))  # Label in Column F
-    data["Customer_Segment"] = ", ".join(segments)
+        if get_cell(7, r) in ["☑", "TRUE", "x", "X", "1", True]:
+            segments.append(get_cell(6, r))     # Label from Column F
+    data["Customer_Segment"] = ", ".join([x for x in segments if x])
 
-    # === MARKETS IMPACTED ===
+    # === Markets Impacted (G18:G39 + H18:H39 checkbox, F18:F39 label) ===
     markets = []
     for r in range(18, 40):
-        # Check both Column G and H for checkboxes
         if get_cell(7, r) in ["☑", "TRUE", "x", "X", "1", True] or get_cell(8, r) in ["☑", "TRUE", "x", "X", "1", True]:
-            markets.append(get_cell(6, r))   # Label in Column F
-    data["Markets_Impacted"] = ", ".join(markets)
+            markets.append(get_cell(6, r))      # Label from Column F
+    data["Markets_Impacted"] = ", ".join([x for x in markets if x])
 
-    # Business Outcome Lead
+    # === Other Fields ===
     data["Business_Outcome_Lead"] = get_cell(4, 16)
-
-    # Text Fields
     data["Capability_Description"] = get_cell(3, 20)
-    data["Investment_Case_Breakdown"] = (get_cell(3, 42) + "\n" + get_cell(3, 43))[:1000]
+    data["Investment_Case_Breakdown"] = get_cell(3, 42)[:1000]
     data["Business_Benefit_WHY"] = get_cell(10, 26)
     data["OKR_Summary"] = get_cell(10, 42)
 
@@ -81,14 +78,14 @@ def extract_from_sheet(wb):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("folder", nargs="?", default=".", help="Root folder")
+    parser.add_argument("folder", nargs="?", default=".", help="Root folder to scan")
     parser.add_argument("-o", "--output", default="Consolidated_Capabilities.xlsx")
     args = parser.parse_args()
 
     root = Path(args.folder).resolve()
     output_file = Path(args.output)
 
-    print(f"Scanning folder: {root}\n")
+    print(f"🔍 Scanning: {root}\n")
 
     records = []
 
@@ -96,7 +93,7 @@ def main():
         if "~$" in file_path.name:
             continue
         if not is_valid_xlsx(file_path):
-            print(f"⚠️ Skipped invalid: {file_path.name}")
+            print(f"⚠️ Skipped (invalid xlsx): {file_path.name}")
             continue
 
         try:
@@ -108,7 +105,7 @@ def main():
             row_data["Date_Read"] = datetime.now().strftime("%Y-%m-%d %H:%M")
 
             records.append(row_data)
-            print(f"✓ Processed: {file_path.name}")
+            print(f"✓ {file_path.name}")
 
         except Exception as e:
             print(f"✗ Failed {file_path.name}: {e}")
@@ -117,7 +114,7 @@ def main():
         print("No files processed.")
         return
 
-    # Save
+    # Write output
     wb_out = Workbook()
     ws = wb_out.active
     ws.title = "Consolidated"
