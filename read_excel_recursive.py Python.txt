@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Consolidate Capability Investment Case - Final Tuned Version
+Consolidate Capability Investment Case - Final Fixed Version
 """
 
 import argparse
@@ -17,13 +17,7 @@ def is_valid_xlsx(file_path):
 
 
 def extract_from_sheet(wb):
-    """Final tuned extraction based on your feedback"""
-    try:
-        ws = wb["1_Financial Investment Case"]
-    except:
-        ws = wb.active
-
-    data = {}
+    ws = wb["1_Financial Investment Case"] if "1_Financial Investment Case" in wb.sheetnames else wb.active
 
     def get_cell(col, row):
         try:
@@ -31,6 +25,8 @@ def extract_from_sheet(wb):
             return str(val).strip() if val is not None else ""
         except:
             return ""
+
+    data = {}
 
     # Basic Fields
     data["Capability_Name"] = get_cell(3, 6)
@@ -42,11 +38,12 @@ def extract_from_sheet(wb):
     data["Business_Capability"] = get_cell(3, 12)
     data["JIRA_ID"] = get_cell(3, 13)
 
-    # FSA Category
+    # === FSA Category ===
     fsa = []
     for r in [12, 13]:
-        if get_cell(6, r) in ["☑", "TRUE", "x", "X", "1"]:
-            fsa.append(get_cell(5, r))
+        checkbox = get_cell(6, r)          # Column F = Checkbox?
+        if checkbox in ["☑", "TRUE", "x", "X", "1", True]:
+            fsa.append(get_cell(5, r))     # Label in Column E
     data["FSA_Category"] = ", ".join(fsa)
 
     # Financial
@@ -56,31 +53,27 @@ def extract_from_sheet(wb):
 
     # === CUSTOMER SEGMENT ===
     segments = []
-    for r in range(6, 10):                    # F6 to F9
-        checkbox = get_cell(7, r)             # G6 to G9
+    for r in range(6, 10):
+        checkbox = get_cell(7, r)          # Column G = Checkbox
         if checkbox in ["☑", "TRUE", "x", "X", "1", True]:
-            segments.append(get_cell(6, r))   # Label in Column F
-    data["Customer_Segment"] = ", ".join([s for s in segments if s])
+            segments.append(get_cell(6, r))  # Label in Column F
+    data["Customer_Segment"] = ", ".join(segments)
 
     # === MARKETS IMPACTED ===
     markets = []
-    for r in range(18, 40):                   # F18 to F39
-        # Check Column G and H
+    for r in range(18, 40):
+        # Check both Column G and H for checkboxes
         if get_cell(7, r) in ["☑", "TRUE", "x", "X", "1", True] or get_cell(8, r) in ["☑", "TRUE", "x", "X", "1", True]:
-            markets.append(get_cell(6, r))    # Label in Column F
-    data["Markets_Impacted"] = ", ".join([m for m in markets if m])
+            markets.append(get_cell(6, r))   # Label in Column F
+    data["Markets_Impacted"] = ", ".join(markets)
 
     # Business Outcome Lead
-    data["Business_Outcome_Lead"] = get_cell(4, 16)   # Value in D16
+    data["Business_Outcome_Lead"] = get_cell(4, 16)
 
     # Text Fields
-    data["Capability_Description"] = get_cell(3, 20)   # C20 (merged)
+    data["Capability_Description"] = get_cell(3, 20)
     data["Investment_Case_Breakdown"] = (get_cell(3, 42) + "\n" + get_cell(3, 43))[:1000]
-
-    # Business Benefit WHY
-    data["Business_Benefit_WHY"] = get_cell(10, 26)   # J26 (merged)
-
-    # OKR Summary (fallback)
+    data["Business_Benefit_WHY"] = get_cell(10, 26)
     data["OKR_Summary"] = get_cell(10, 42)
 
     return data
@@ -95,7 +88,7 @@ def main():
     root = Path(args.folder).resolve()
     output_file = Path(args.output)
 
-    print(f"Scanning: {root}\n")
+    print(f"Scanning folder: {root}\n")
 
     records = []
 
@@ -103,7 +96,7 @@ def main():
         if "~$" in file_path.name:
             continue
         if not is_valid_xlsx(file_path):
-            print(f"⚠️ Skipped: {file_path.name}")
+            print(f"⚠️ Skipped invalid: {file_path.name}")
             continue
 
         try:
@@ -115,7 +108,7 @@ def main():
             row_data["Date_Read"] = datetime.now().strftime("%Y-%m-%d %H:%M")
 
             records.append(row_data)
-            print(f"✓ {file_path.name}")
+            print(f"✓ Processed: {file_path.name}")
 
         except Exception as e:
             print(f"✗ Failed {file_path.name}: {e}")
@@ -124,7 +117,7 @@ def main():
         print("No files processed.")
         return
 
-    # Save to Excel
+    # Save
     wb_out = Workbook()
     ws = wb_out.active
     ws.title = "Consolidated"
@@ -144,7 +137,7 @@ def main():
             ws.cell(r_idx, c_idx, row.get(h, ""))
 
     wb_out.save(output_file)
-    print(f"\n✅ Successfully saved {len(records)} rows to {output_file}")
+    print(f"\n✅ Saved {len(records)} rows to {output_file}")
 
 
 if __name__ == "__main__":
