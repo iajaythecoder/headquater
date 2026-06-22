@@ -1,86 +1,70 @@
 #!/usr/bin/env python3
 """
-Recursively read all Excel files from a folder and its subfolders.
+Recursively read Excel files — NO pandas required
 """
 
 import argparse
 from pathlib import Path
+import zipfile
 from openpyxl import load_workbook
 import sys
 
 
+def is_valid_xlsx(file_path):
+    """Quick check if file is a valid zip (real xlsx)"""
+    try:
+        return zipfile.is_zipfile(file_path)
+    except:
+        return False
+
+
 def main():
-    parser = argparse.ArgumentParser(
-        description="Recursively find and read all Excel files in a folder tree."
-    )
-    parser.add_argument(
-        "folder", 
-        nargs="?", 
-        default=".",
-        help="Root folder to search (default: current directory)"
-    )
-    parser.add_argument(
-        "-e", "--extensions", 
-        nargs="+", 
-        default=[".xlsx", ".xls", ".xlsm"],
-        help="File extensions to search for (default: .xlsx .xls .xlsm)"
-    )
-    parser.add_argument(
-        "-s", "--summary", 
-        action="store_true",
-        help="Show only summary (no detailed sheet names)"
-    )
-    parser.add_argument(
-        "-o", "--output",
-        help="Save list of found files to a text file"
-    )
+    parser = argparse.ArgumentParser(description="Recursively scan Excel files (no pandas)")
+    parser.add_argument("folder", nargs="?", default=".", help="Root folder to search")
+    parser.add_argument("-e", "--ext", nargs="+", default=[".xlsx", ".xlsm"], 
+                       help="Extensions to scan")
+    parser.add_argument("-o", "--output", help="Save list of good files to text file")
 
     args = parser.parse_args()
 
     root = Path(args.folder).resolve()
+    extensions = {ext.lower() for ext in args.ext}
     
-    if not root.exists():
-        print(f"Error: Folder '{root}' does not exist.", file=sys.stderr)
-        sys.exit(1)
+    print(f"🔍 Scanning for Excel files in: {root}\n")
 
-    print(f"🔍 Searching for Excel files in: {root}\n")
+    good_files = []
+    skipped = 0
 
-    extensions = {ext.lower() for ext in args.extensions}
-    excel_files = []
-    count = 0
-
-    for file_path in root.rglob("*"):
+    for file_path in sorted(root.rglob("*")):
         if file_path.is_file() and file_path.suffix.lower() in extensions:
-            count += 1
+            if not is_valid_xlsx(file_path):
+                print(f"⚠️  Skipped (not a valid xlsx): {file_path.name}")
+                skipped += 1
+                continue
+
             try:
-                wb = load_workbook(file_path, data_only=True)
-                sheet_count = len(wb.sheetnames)
+                wb = load_workbook(file_path, data_only=True, read_only=True)
+                print(f"✓ {file_path.name}  ({len(wb.sheetnames)} sheets)")
                 
-                print(f"✓ {file_path.name}  ({sheet_count} sheets)  →  {file_path.parent.name}/")
-                
-                excel_files.append({
+                good_files.append({
                     "path": str(file_path),
-                    "filename": file_path.name,
+                    "name": file_path.name,
                     "folder": str(file_path.parent.relative_to(root)),
                     "sheets": wb.sheetnames
                 })
-                
             except Exception as e:
-                print(f"✗ Error reading {file_path.name}: {e}")
+                print(f"✗ Failed to read {file_path.name}: {e}")
+                skipped += 1
 
-    # Summary
-    print("\n" + "="*60)
-    print(f"✅ Completed! Found {count} Excel file(s)")
-    print("="*60)
+    print("\n" + "="*70)
+    print(f"✅ Done! Successfully read {len(good_files)} file(s) | Skipped {skipped}")
+    print("="*70)
 
-    if args.output:
+    if args.output and good_files:
         with open(args.output, "w", encoding="utf-8") as f:
-            for file in excel_files:
-                f.write(f"{file['path']}\n")
-        print(f"📄 File list saved to: {args.output}")
-
-    if args.summary:
-        print(f"Total Excel files found: {count}")
+            for f_info in good_files:
+                f.write(f"{f_info['path']}\n")
+        print(f"📄 Saved list to: {args.output}")
 
 
 if __name__ == "__main__":
