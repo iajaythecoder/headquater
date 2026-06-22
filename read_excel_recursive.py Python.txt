@@ -145,4 +145,18 @@ def main():
                "JIRA_ID", "FSA_Category", "T_Shirt_Size", "Tech_Investment_2027_k",
                "Multi_Year_Funding", "Customer_Segment", "Markets_Impacted",
                "Business_Outcome_Lead", "Capability_Description", "Investment_Case_Breakdown",
-               "Business_Benefit_WHY", "OKR_S
+               "Business_Benefit_WHY", "OKR_Summary"]
+
+    for col, h in enumerate(headers, 1):
+        ws.cell(1, col, h)
+
+    for r_idx, row in enumerate(records, 2):
+        for c_idx, h in enumerate(headers, 1):
+            ws.cell(r_idx, c_idx, row.get(h, ""))
+
+    wb_out.save(output_file)
+    print(f"\n✅ Saved {len(records)} rows to {output_file}")
+
+
+if __name__ == "__main__":
+    main()
